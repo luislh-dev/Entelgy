@@ -2,6 +2,7 @@ package com.entelgy;
 
 import com.entelgy.constants.ConsoleColors;
 import com.entelgy.enums.TipoMovimiento;
+import com.entelgy.exception.InvalidAnimalException;
 import com.entelgy.factory.AnimalFactory;
 import com.entelgy.model.Animal;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,28 +22,27 @@ public class AnimalApplication {
 	}
 
 	public void ejecutar(String[] args) {
-		if (args.length == 0) {
-			System.out.println(ConsoleColors.AMARILLO + "No se proporcionaron argumentos. Ejecute el programa con el formato: 'Nombre|Onomatopeya|Tipo'" + ConsoleColors.RESET);
-			return;
-		}
+		List<Animal> animals = new ArrayList<>();
 
-		List<Animal> animals = Arrays.stream(args)
-			.map(this::procesarEntrada)
-			.filter(Optional::isPresent)
-			.map(Optional::get)
-			.collect(Collectors.toList());
+		for (String input : args) {
+			try {
+				procesarEntrada(input).ifPresent(animals::add);
+			} catch (InvalidAnimalException e) {
+				System.out.println(ConsoleColors.AMARILLO + e.getMessage() + ConsoleColors.RESET);
+			}
+		}
 
 		agruparYMostrar(animals);
 	}
 
+
 	/**
 	 * Procesa una línea de entrada y devuelve un Optional<Animal> si es válido.
 	 */
-	private Optional<Animal> procesarEntrada(String input) {
+	Optional<Animal> procesarEntrada(String input) {
 		String[] parts = input.split("\\|");
 		if (parts.length != 3) {
-			System.out.println("Entrada inválida: " + input + ". Use el formato 'Nombre|Onomatopeya|Tipo'.");
-			return Optional.empty();
+			throw new InvalidAnimalException("Entrada inválida: " + input + ". Use el formato 'Nombre|Onomatopeya|Tipo'.");
 		}
 
 		String nombre = parts[0].trim();
@@ -50,14 +50,12 @@ public class AnimalApplication {
 		String tipoStr = parts[2].trim();
 
 		if (nombre.isEmpty() || onomatopeya.isEmpty()) {
-			System.out.println(ConsoleColors.AMARILLO + "Nombre u onomatopeya vacíos en: " + input + ". Se omitirá este animal." + ConsoleColors.RESET);
-			return Optional.empty();
+			throw new InvalidAnimalException("Nombre u onomatopeya vacíos en: " + input + ".");
 		}
 
 		Optional<TipoMovimiento> tipoMovimiento = TipoMovimiento.desdeNombreEntrada(tipoStr);
 		if (tipoMovimiento.isEmpty()) {
-			System.out.println(ConsoleColors.AMARILLO + "Tipo no válido: " + tipoStr + " en: " + input + ". Se omitirá este animal." + ConsoleColors.RESET);
-			return Optional.empty();
+			throw new InvalidAnimalException("Tipo no válido: " + tipoStr + " en: " + input + ".");
 		}
 
 		return Optional.of(factory.crearAnimal(nombre, onomatopeya, tipoMovimiento.get()));
